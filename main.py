@@ -36,7 +36,7 @@ class Layer:
         self.a = 1 / (1 + np.exp(0 - self.z))
         return self.a
 
-    def bp(self, input_error, cur_x, lr=0.01):
+    def bp(self, input_error, cur_x, lr=1.0):
         next_delta = None
         if self.last_layer is None:
             a_temp = np.insert(cur_x, cur_x.shape[0], values=np.array([1, ]), axis=0)
@@ -85,18 +85,22 @@ class Model:
         sample_count = train_x.shape[0]
 
         for t in range(0, time):
+            for i in range(0, sample_count):
+                cur_x = train_x[i]
+                cur_y = train_y[i]
+                cur_result = self.fp_calculate(cur_x)
+                self.bp_calculate((cur_result - cur_y), cur_x.reshape(self.header_layer.theta.shape[1] - 1, 1), lr=lr)
+
             loss = 0
             for i in range(0, sample_count):
                 cur_x = train_x[i]
                 cur_y = train_y[i]
                 cur_result = self.fp_calculate(cur_x)
-                self.bp_calculate((cur_result - cur_y) / sample_count, cur_x.reshape(self.header_layer.theta.shape[1] - 1, 1), lr=lr)
-                cur_loss = cur_y * np.log(cur_result) + (1 - cur_y) * np.log(1 - cur_result)
-                loss += cur_loss
-            loss = -np.sum(loss)
-            loss /= sample_count
-            print(loss)
+                loss += (cur_result - cur_y) ** 2
+            print(loss / sample_count)
 
+    def predict(self, predict_x):
+        return self.fp_calculate(predict_x)
 
 def main():
     x = np.array([i for i in range(0, 100)])
@@ -104,8 +108,14 @@ def main():
 
     model: Model = Model()
     model.add_layer(Layer(1, input_shape=(1,)))
-    model.fit(x, y, time=1000, lr=0.3)
+    model.add_layer(Layer(2))
+    model.add_layer(Layer(1))
+    model.fit(x, y, time=100, lr=0.01)
 
+    print(model.predict(np.array([33, ]))[0] > 0.5)
+    print(model.predict(np.array([44, ]))[0] > 0.5)
+    print(model.predict(np.array([55, ]))[0] > 0.5)
+    print(model.predict(np.array([66, ]))[0] > 0.5)
 
 if __name__ == '__main__':
     main()
