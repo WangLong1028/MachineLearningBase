@@ -36,14 +36,18 @@ class Layer:
         self.a = 1 / (1 + np.exp(0 - self.z))
         return self.a
 
-    def bp(self, input_error):
+    def bp(self, input_error, cur_x, lr=0.01):
+        next_delta = None
         if self.last_layer is None:
-            return
-        self.delta += input_error
-        a_temp = np.insert(self.last_layer.a, self.last_layer.a.shape[0], values=np.array([1, ]), axis=0)
+            a_temp = np.insert(cur_x, cur_x.shape[0], values=np.array([1, ]), axis=0)
+        else:
+            a_temp = np.insert(self.last_layer.a, self.last_layer.a.shape[0], values=np.array([1, ]), axis=0)
+            next_delta = np.dot(self.theta.transpose(), input_error)[1:self.last_layer.neuron_count + 1] * self.last_layer.a * (
+                    1 - self.last_layer.a)
+        self.delta = input_error
         self.gradient = np.dot(self.delta, a_temp.transpose())
-        self.theta -= 0.01 * self.gradient
-        return np.dot(self.theta.transpose(), input_error)[1:self.last_layer.neuron_count + 1] * self.last_layer.a * (1 - self.last_layer.a)
+        self.theta -= lr * self.gradient
+        return next_delta
 
 
 class Model:
@@ -70,14 +74,14 @@ class Model:
             cur_layer = cur_layer.next_layer
         return result
 
-    def bp_calculate(self, input_delta):
+    def bp_calculate(self, input_delta, cur_x, lr=0.01):
         cur_layer = self.rear_layer
         cur_delta = input_delta
         while cur_layer is not None:
-            cur_delta = cur_layer.bp(cur_delta)
+            cur_delta = cur_layer.bp(cur_delta, cur_x, lr=lr)
             cur_layer = cur_layer.last_layer
 
-    def fit(self, train_x, train_y, time=1000):
+    def fit(self, train_x, train_y, time=1000, lr=0.01):
         sample_count = train_x.shape[0]
 
         for t in range(0, time):
@@ -86,7 +90,7 @@ class Model:
                 cur_x = train_x[i]
                 cur_y = train_y[i]
                 cur_result = self.fp_calculate(cur_x)
-                self.bp_calculate(cur_result - cur_y)
+                self.bp_calculate((cur_result - cur_y) / sample_count, cur_x.reshape(self.header_layer.theta.shape[1] - 1, 1), lr=lr)
                 cur_loss = cur_y * np.log(cur_result) + (1 - cur_y) * np.log(1 - cur_result)
                 loss += cur_loss
             loss = -np.sum(loss)
@@ -100,9 +104,7 @@ def main():
 
     model: Model = Model()
     model.add_layer(Layer(1, input_shape=(1,)))
-    model.add_layer(Layer(2))
-    model.add_layer(Layer(1))
-    model.fit(x, y)
+    model.fit(x, y, time=1000, lr=0.3)
 
 
 if __name__ == '__main__':
